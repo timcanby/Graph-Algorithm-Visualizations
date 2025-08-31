@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Floyd-Warshall: The Matrix of Connections</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+        #main-container {
+            display: flex;
+            gap: 20px;
+            width: 98%;
+            height: 98%;
+        }
+        #left-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        #graph-container {
+            position: relative;
+            flex-grow: 1;
+            background-color: #1e1e1e;
+            border-radius: 15px;
+            box-shadow: 0 0 25px rgba(0, 0, 0, 0.6 );
+        }
+        svg {
+            width: 100%;
+            height: 100%;
+        }
+        #controls-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 10px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: 600;
+            border: 2px solid #03dac6;
+            border-radius: 8px;
+            cursor: pointer;
+            background-color: transparent;
+            color: #03dac6;
+            transition: all 0.3s ease;
+        }
+        button:hover:not(:disabled) {
+            background-color: #03dac6;
+            color: #121212;
+        }
+        button:disabled {
+            border-color: #444;
+            color: #444;
+        }
+        #info-panel {
+            font-size: 1.1em;
+            text-align: right;
+        }
+        #matrix-container {
+            width: 45%;
+            padding: 20px;
+            background-color: #1e1e1e;
+            border-radius: 15px;
+            box-shadow: 0 0 25px rgba(0, 0, 0, 0.6);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #matrix-container h2 {
+            margin: 0 0 15px 0;
+            color: #bb86fc;
+        }
+        #distance-matrix {
+            display: grid;
+            border: 1px solid #444;
+        }
+        .matrix-cell {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border: 1px solid #333;
+            font-weight: bold;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+        .header {
+            background-color: #333;
+            color: #bb86fc;
+        }
+        .cell-value {
+            cursor: pointer;
+        }
+        .cell-value:hover {
+            background-color: #03dac6;
+            color: #121212;
+        }
+        .highlight-k {
+            background-color: #bb86fc;
+            color: #121212;
+        }
+        .highlight-i { background-color: #1f77b4; }
+        .highlight-j { background-color: #ff7f0e; }
+        .highlight-update {
+            animation: flash-update 0.8s ease;
+        }
+        @keyframes flash-update {
+            0%, 100% { background-color: #2ca02c; color: white; }
+            50% { background-color: #fff; color: black; transform: scale(1.2); }
+        }
+        .node circle { stroke: #fff; stroke-width: 2px; transition: all 0.3s ease; }
+        .node text { fill: #fff; font-size: 14px; pointer-events: none; text-anchor: middle; dominant-baseline: central; font-weight: bold; }
+        .link { stroke: #666; stroke-width: 2px; }
+        .link-label { fill: #ccc; font-size: 12px; text-anchor: middle; pointer-events: none; }
+        .path { stroke-width: 5px; transition: stroke 0.3s ease; }
+    </style>
+</head>
+<body>
+    <div id="main-container">
+        <div id="left-panel">
+            <div id="graph-container">
+                <svg id="svg"></svg>
+            </div>
+            <div id="controls-info">
+                <div class="controls">
+                    <button id="startBtn">Start</button>
+                    <button id="resetBtn">Reset</button>
+                </div>
+                <div id="info-panel">Ready to begin.</div>
+            </div>
+        </div>
+        <div id="matrix-container">
+            <h2>Distance Matrix</h2>
+            <div id="distance-matrix"></div>
+        </div>
+    </div>
+
+<script>
+    // --- D3 Setup & UI ---
+    const svg = d3.select("svg");
+    const startBtn = document.getElementById('startBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const infoPanel = document.getElementById('info-panel');
+    const matrixDiv = document.getElementById('distance-matrix');
+
+    // --- Config ---
+    const NUM_NODES = 8; // Keep it small to fit the matrix on screen
+    const ANIMATION_SPEED = 100;
+
+    let nodesData, linksData, simulation, dist, next;
+    let isRunning = false;
+    let zoomGroup, linkElements, nodeElements, labelElements;
+    
+    // --- Graph Generation ---
+    function generateGraph() {
+        const nodes = d3.range(NUM_NODES).map(i => ({ id: i }));
+        const links = [];
+        const linkSet = new Set();
+
+        for (let i = 0; i < NUM_NODES * 1.8; i++) {
+            const source = Math.floor(Math.random() * NUM_NODES);
+            const target = Math.floor(Math.random() * NUM_NODES);
+            const key = `${Math.min(source, target)},${Math.max(source, target)}`;
+            if (source !== target && !linkSet.has(key)) {
+                const weight = Math.floor(Math.random() * 15) + 1;
+                links.push({ source, target, weight });
+                linkSet.add(key);
+            }
+        }
+        return { nodes, links };
+    }
+    
+    // --- Matrix Initialization & Drawing ---
+    function initializeMatrices() {
+        dist = Array(NUM_NODES).fill(null).map(() => Array(NUM_NODES).fill(Infinity));
+        next = Array(NUM_NODES).fill(null).map(() => Array(NUM_NODES).fill(null));
+
+        for (let i = 0; i < NUM_NODES; i++) {
+            dist[i][i] = 0;
+            next[i][i] = i;
+        }
+
+        linksData.forEach(link => {
+            dist[link.source][link.target] = link.weight;
+            dist[link.target][link.source] = link.weight; // Undirected graph
+            next[link.source][link.target] = link.target;
+            next[link.target][link.source] = link.source;
+        });
+    }
+
+    function drawMatrix() {
+        matrixDiv.innerHTML = '';
+        matrixDiv.style.gridTemplateColumns = `repeat(${NUM_NODES + 1}, 1fr)`;
+
+        // Headers
+        matrixDiv.appendChild(createCell('', 'header'));
+        for (let j = 0; j < NUM_NODES; j++) matrixDiv.appendChild(createCell(j, 'header'));
+        
+        // Rows
+        for (let i = 0; i < NUM_NODES; i++) {
+            matrixDiv.appendChild(createCell(i, 'header'));
+            for (let j = 0; j < NUM_NODES; j++) {
+                const val = dist[i][j] === Infinity ? '∞' : dist[i][j];
+                const cell = createCell(val, 'cell-value', `cell-${i}-${j}`);
+                cell.onclick = () => { if(!isRunning) highlightPath(i, j); };
+                matrixDiv.appendChild(cell);
+            }
+        }
+    }
+
+    function createCell(text, className, id = null) {
+        const cell = document.createElement('div');
+        cell.className = `matrix-cell ${className}`;
+        if (id) cell.id = id;
+        cell.textContent = text;
+        return cell;
+    }
+
+    // --- D3 Drawing ---
+    function initializeVisuals() {
+        const { clientWidth: width, clientHeight: height } = document.getElementById('graph-container');
+        simulation = d3.forceSimulation(nodesData)
+            .force("link", d3.forceLink(linksData).id(d => d.id).distance(100))
+            .force("charge", d3.forceManyBody().strength(-400))
+            .force("center", d3.forceCenter(width / 2, height / 2));
+
+        svg.html('');
+        zoomGroup = svg.append("g");
+
+        linkElements = zoomGroup.append("g").selectAll("line").data(linksData).enter().append("line").attr("class", "link");
+        labelElements = zoomGroup.append("g").selectAll("text").data(linksData).enter().append("text").attr("class", "link-label").text(d => d.weight);
+        nodeElements = zoomGroup.append("g").selectAll("g").data(nodesData).enter().append("g").attr("class", "node").attr("id", d => `node-${d.id}`);
+        nodeElements.append("circle").attr("r", 15);
+        nodeElements.append("text").text(d => d.id);
+
+        simulation.on("tick", () => {
+            linkElements.attr("x1", d => d.source.x).attr("y1", d => d.source.y).attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+            labelElements.attr("x", d => (d.source.x + d.target.x) / 2).attr("y", d => (d.source.y + d.target.y) / 2);
+            nodeElements.attr("transform", d => `translate(${d.x},${d.y})`);
+        });
+    }
+
+    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    // --- Floyd-Warshall Algorithm ---
+    async function floydWarshall() {
+        isRunning = true;
+        startBtn.disabled = true;
+        resetBtn.disabled = true;
+
+        for (let k = 0; k < NUM_NODES; k++) {
+            infoPanel.innerHTML = `Using pivot node <strong>${k}</strong> to find shorter paths.`;
+            highlightMatrixHeader(k, 'highlight-k');
+            d3.select(`#node-${k} circle`).attr("fill", "#bb86fc").attr("r", 20);
+            await sleep(ANIMATION_SPEED * 5);
+
+            for (let i = 0; i < NUM_NODES; i++) {
+                highlightMatrixHeader(i, 'highlight-i');
+                for (let j = 0; j < NUM_NODES; j++) {
+                    highlightMatrixHeader(j, 'highlight-j');
+                    
+                    const cell_ik = document.getElementById(`cell-${i}-${k}`);
+                    const cell_kj = document.getElementById(`cell-${k}-${j}`);
+                    cell_ik.style.backgroundColor = '#1f77b4';
+                    cell_kj.style.backgroundColor = '#ff7f0e';
+                    
+                    await sleep(ANIMATION_SPEED);
+
+                    if (dist[i][k] + dist[k][j] < dist[i][j]) {
+                        dist[i][j] = dist[i][k] + dist[k][j];
+                        next[i][j] = next[i][k];
+                        
+                        const cell_ij = document.getElementById(`cell-${i}-${j}`);
+                        cell_ij.textContent = dist[i][j];
+                        cell_ij.classList.add('highlight-update');
+                        infoPanel.innerHTML = `Path ${i}→${j} updated via ${k}! New distance: <strong>${dist[i][j]}</strong>`;
+                        
+                        await sleep(ANIMATION_SPEED * 4);
+                        cell_ij.classList.remove('highlight-update');
+                    }
+                    cell_ik.style.backgroundColor = '';
+                    cell_kj.style.backgroundColor = '';
+                }
+                clearMatrixHeaderHighlights('highlight-j');
+            }
+            clearMatrixHeaderHighlights('highlight-i');
+            d3.select(`#node-${k} circle`).attr("fill", null).attr("r", 15);
+        }
+        clearMatrixHeaderHighlights('highlight-k');
+        infoPanel.textContent = "Finished! Click any cell in the matrix to see the shortest path.";
+        isRunning = false;
+        resetBtn.disabled = false;
+    }
+
+    function highlightMatrixHeader(index, className) {
+        document.querySelectorAll('.header').forEach((h, idx) => {
+            if (idx === index + 1 || idx === (index + 1) * (NUM_NODES + 1)) {
+                h.classList.add(className);
+            }
+        });
+    }
+
+    function clearMatrixHeaderHighlights(className) {
+        document.querySelectorAll(`.${className}`).forEach(h => h.classList.remove(className));
+    }
+
+    function highlightPath(i, j) {
+        linkElements.classed("path", false).attr("stroke", "#666");
+        if (next[i][j] === null) return;
+
+        let path = [i];
+        let current = i;
+        while (current !== j) {
+            current = next[current][j];
+            path.push(current);
+        }
+        
+        for (let k = 0; k < path.length - 1; k++) {
+            const u = path[k];
+            const v = path[k+1];
+            const link = linksData.find(l => (l.source.id === u && l.target.id === v) || (l.source.id === v && l.target.id === u));
+            if (link) {
+                d3.select(linkElements.nodes().find(n => n.__data__ === link)).classed("path", true).attr("stroke", "#03dac6");
+            }
+        }
+        infoPanel.innerHTML = `Path ${i}→${j}: <strong>${path.join('→')}</strong> | Distance: <strong>${dist[i][j]}</strong>`;
+    }
+
+    // --- Control Logic ---
+    function reset() {
+        if (isRunning) return;
+        const graph = generateGraph();
+        nodesData = graph.nodes;
+        linksData = graph.links;
+        
+        initializeMatrices();
+        drawMatrix();
+        initializeVisuals();
+        
+        infoPanel.textContent = "Ready to begin.";
+        startBtn.disabled = false;
+        resetBtn.disabled = false;
+    }
+    
+    startBtn.addEventListener('click', () => { if (!isRunning) floydWarshall(); });
+    resetBtn.addEventListener('click', reset);
+    
+    // Initial load
+    reset();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A* Algorithm: The Guided Path</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+        #main-container {
+            display: flex;
+            gap: 20px;
+            width: 98%;
+            height: 98%;
+            align-items: flex-start;
+        }
+        #grid-container {
+            flex: 3;
+            background-color: #1e1e1e;
+            border-radius: 15px;
+            box-shadow: 0 0 25px rgba(0, 0, 0, 0.6 );
+            aspect-ratio: 1.6 / 1; /* Maintain aspect ratio */
+        }
+        svg {
+            width: 100%;
+            height: 100%;
+        }
+        #sidebar {
+            flex: 1;
+            padding: 20px;
+            background-color: #1e1e1e;
+            border-radius: 15px;
+            box-shadow: 0 0 25px rgba(0, 0, 0, 0.6);
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        #sidebar h2 { margin: 0 0 10px 0; text-align: center; color: #bb86fc; }
+        .control-group { margin-bottom: 15px; }
+        .control-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .radio-group input { margin-right: 5px; }
+        button {
+            width: 100%;
+            padding: 12px 20px;
+            font-size: 16px;
+            font-weight: 600;
+            border: 2px solid #03dac6;
+            border-radius: 8px;
+            cursor: pointer;
+            background-color: transparent;
+            color: #03dac6;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+        button:hover:not(:disabled) { background-color: #03dac6; color: #121212; }
+        button:disabled { border-color: #444; color: #444; }
+        #info-panel { font-size: 1.1em; text-align: center; margin-top: auto; }
+        .grid-cell { stroke: #444; stroke-width: 1px; transition: fill 0.3s ease-in-out; }
+        .start { fill: #2ca02c; }
+        .end { fill: #d62728; }
+        .wall { fill: #333; }
+        .open-set { fill: #ff7f0e; }
+        .closed-set { fill: #1f77b4; }
+        .path { fill: #fdd835; }
+    </style>
+</head>
+<body>
+    <div id="main-container">
+        <div id="grid-container">
+            <svg id="svg"></svg>
+        </div>
+        <div id="sidebar">
+            <h2>A* Pathfinding</h2>
+            <div class="control-group">
+                <label>Drawing Mode:</label>
+                <div class="radio-group">
+                    <input type="radio" id="draw-wall" name="draw-mode" value="wall" checked>
+                    <label for="draw-wall">Wall</label>
+                    <input type="radio" id="draw-start" name="draw-mode" value="start">
+                    <label for="draw-start">Start</label>
+                    <input type="radio" id="draw-end" name="draw-mode" value="end">
+                    <label for="draw-end">End</label>
+                </div>
+            </div>
+            <button id="startBtn">Start Search</button>
+            <button id="resetBtn">Reset Grid</button>
+            <button id="clearPathBtn">Clear Path</button>
+            <div id="info-panel">Draw walls, set start/end points, then start the search.</div>
+        </div>
+    </div>
+
+<script>
+    // --- D3 Setup & UI ---
+    const svg = d3.select("svg");
+    const startBtn = document.getElementById('startBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const clearPathBtn = document.getElementById('clearPathBtn');
+    const infoPanel = document.getElementById('info-panel');
+
+    // --- Config ---
+    const GRID_WIDTH = 48;
+    const GRID_HEIGHT = 30;
+    const ANIMATION_SPEED = 10;
+
+    let grid = [], nodes = [];
+    let startNode = null, endNode = null;
+    let isRunning = false, isMouseDown = false;
+
+    // --- Node Class ---
+    class Node {
+        constructor(x, y, isWall = false) {
+            this.x = x;
+            this.y = y;
+            this.isWall = isWall;
+            this.g = Infinity;
+            this.h = 0;
+            this.f = Infinity;
+            this.parent = null;
+        }
+        reset() {
+            this.g = Infinity;
+            this.h = 0;
+            this.f = Infinity;
+            this.parent = null;
+        }
+    }
+
+    // --- Grid & Visuals ---
+    function initializeGrid() {
+        const { clientWidth, clientHeight } = document.getElementById('grid-container');
+        const cellWidth = clientWidth / GRID_WIDTH;
+        const cellHeight = clientHeight / GRID_HEIGHT;
+
+        grid = [];
+        nodes = [];
+        svg.html('');
+
+        for (let y = 0; y < GRID_HEIGHT; y++) {
+            const row = [];
+            for (let x = 0; x < GRID_WIDTH; x++) {
+                const node = new Node(x, y);
+                row.push(node);
+                nodes.push(node);
+            }
+            grid.push(row);
+        }
+
+        svg.selectAll("rect")
+            .data(nodes)
+            .enter().append("rect")
+            .attr("class", "grid-cell")
+            .attr("id", d => `cell-${d.x}-${d.y}`)
+            .attr("x", d => d.x * cellWidth)
+            .attr("y", d => d.y * cellHeight)
+            .attr("width", cellWidth)
+            .attr("height", cellHeight)
+            .on("mousedown", handleCellInteraction)
+            .on("mouseover", handleCellInteraction)
+            .on("mouseup", () => { isMouseDown = false; });
+        
+        svg.on("mouseleave", () => { isMouseDown = false; });
+
+        // Default start and end
+        setStartNode(grid[Math.floor(GRID_HEIGHT/2)][Math.floor(GRID_WIDTH/4)]);
+        setEndNode(grid[Math.floor(GRID_HEIGHT/2)][Math.floor(GRID_WIDTH * 3/4)]);
+    }
+
+    function handleCellInteraction(event, d) {
+        if (isRunning) return;
+        if (event.type === 'mousedown') isMouseDown = true;
+        if (!isMouseDown) return;
+
+        const mode = document.querySelector('input[name="draw-mode"]:checked').value;
+        if (mode === 'wall') {
+            if (d !== startNode && d !== endNode) {
+                d.isWall = !d.isWall;
+                d3.select(this).classed("wall", d.isWall);
+            }
+        } else if (mode === 'start') {
+            setStartNode(d);
+        } else if (mode === 'end') {
+            setEndNode(d);
+        }
+    }
+
+    function setStartNode(node) {
+        if (isRunning || node.isWall || node === endNode) return;
+        if (startNode) d3.select(`#cell-${startNode.x}-${startNode.y}`).classed("start", false);
+        startNode = node;
+        d3.select(`#cell-${startNode.x}-${startNode.y}`).classed("start", true);
+    }
+
+    function setEndNode(node) {
+        if (isRunning || node.isWall || node === startNode) return;
+        if (endNode) d3.select(`#cell-${endNode.x}-${endNode.y}`).classed("end", false);
+        endNode = node;
+        d3.select(`#cell-${endNode.x}-${endNode.y}`).classed("end", true);
+    }
+
+    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    // --- A* Algorithm ---
+    async function aStar() {
+        if (!startNode || !endNode) {
+            infoPanel.textContent = "Please set both start and end points.";
+            return;
+        }
+        isRunning = true;
+        startBtn.disabled = true;
+        clearPathBtn.disabled = true;
+
+        const openSet = [startNode];
+        startNode.g = 0;
+        startNode.h = heuristic(startNode, endNode);
+        startNode.f = startNode.h;
+
+        while (openSet.length > 0) {
+            openSet.sort((a, b) => a.f - b.f);
+            const currentNode = openSet.shift();
+
+            if (currentNode === endNode) {
+                await drawPath(currentNode);
+                infoPanel.textContent = "Path Found!";
+                isRunning = false;
+                clearPathBtn.disabled = false;
+                return;
+            }
+
+            if (currentNode !== startNode) {
+                d3.select(`#cell-${currentNode.x}-${currentNode.y}`).classed("closed-set", true);
+            }
+
+            const neighbors = getNeighbors(currentNode);
+            for (const neighbor of neighbors) {
+                const tentativeG = currentNode.g + 1; // Assuming grid distance is 1
+                if (tentativeG < neighbor.g) {
+                    neighbor.parent = currentNode;
+                    neighbor.g = tentativeG;
+                    neighbor.h = heuristic(neighbor, endNode);
+                    neighbor.f = neighbor.g + neighbor.h;
+                    
+                    if (!openSet.some(node => node === neighbor)) {
+                        openSet.push(neighbor);
+                        if (neighbor !== endNode) {
+                            d3.select(`#cell-${neighbor.x}-${neighbor.y}`).classed("open-set", true);
+                        }
+                    }
+                }
+            }
+            await sleep(ANIMATION_SPEED);
+        }
+
+        infoPanel.textContent = "No path found!";
+        isRunning = false;
+        clearPathBtn.disabled = false;
+    }
+
+    function heuristic(a, b) {
+        // Manhattan distance
+        return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+    }
+
+    function getNeighbors(node) {
+        const neighbors = [];
+        const { x, y } = node;
+        if (x > 0) neighbors.push(grid[y][x - 1]);
+        if (x < GRID_WIDTH - 1) neighbors.push(grid[y][x + 1]);
+        if (y > 0) neighbors.push(grid[y - 1][x]);
+        if (y < GRID_HEIGHT - 1) neighbors.push(grid[y + 1][x]);
+        return neighbors.filter(n => !n.isWall);
+    }
+
+    async function drawPath(endNode) {
+        let currentNode = endNode;
+        while (currentNode !== null) {
+            if (currentNode !== startNode && currentNode !== endNode) {
+                d3.select(`#cell-${currentNode.x}-${currentNode.y}`).classed("path", true);
+                await sleep(ANIMATION_SPEED * 2);
+            }
+            currentNode = currentNode.parent;
+        }
+    }
+
+    // --- Control Logic ---
+    function resetGrid() {
+        if (isRunning) return;
+        startNode = null;
+        endNode = null;
+        initializeGrid();
+        infoPanel.textContent = "Draw walls, set start/end points, then start the search.";
+        startBtn.disabled = false;
+        clearPathBtn.disabled = true;
+    }
+
+    function clearPath() {
+        if (isRunning) return;
+        nodes.forEach(node => {
+            node.reset();
+            const cell = d3.select(`#cell-${node.x}-${node.y}`);
+            if (!node.isWall && node !== startNode && node !== endNode) {
+                cell.attr("class", "grid-cell");
+            }
+        });
+        infoPanel.textContent = "Path cleared. You can start a new search.";
+        startBtn.disabled = false;
+    }
+    
+    startBtn.addEventListener('click', () => { if (!isRunning) { clearPath(); aStar(); } });
+    resetBtn.addEventListener('click', resetGrid);
+    clearPathBtn.addEventListener('click', clearPath);
+    
+    // Initial load
+    initializeGrid();
+
+</script>
+</body>
+</html>

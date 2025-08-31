@@ -21,7 +21,7 @@ Built with **D3.js**, these self-contained HTML files can be run directly in any
 
 ## 🔹 Kosaraju's Algorithm: Strongly Connected Components
 
-![Kosaraju Visualization Screenshot](./kosaraju-screenshot.png)  
+![Kosaraju Visualization Screenshot](Kosaraju.gif)  
 
 **Story & Concept**: Tangled Web → Reversal → Discovery.  
 **Features**: Animated DFS passes, finish-order stack, SCC clustering.  
@@ -32,7 +32,7 @@ Built with **D3.js**, these self-contained HTML files can be run directly in any
 ## 🔹 Dijkstra's Algorithm: Shortest Paths
 
 
-![Dijkstra Visualization Screenshot](./dijkstra-screenshot.gif)  
+![Dijkstra Visualization Screenshot](Dijkstra.gif)  
 
 **Story & Concept**: *Ripple of Discovery* — shortest paths expand like waves.  
 **Features**: Live priority queue, color feedback, weighted edges.  
@@ -43,7 +43,7 @@ Built with **D3.js**, these self-contained HTML files can be run directly in any
 ## 🔹 Floyd-Warshall Algorithm: All-Pairs Shortest Paths
 
 
-![Floyd-Warshall Visualization Screenshot](./floyd-warshall-screenshot.gif)  
+![Floyd-Warshall Visualization Screenshot](Floyd-Warshall .gif)  
 
 **Story & Concept**: Matrix-based dynamic programming, pivot iteration, triangular relaxation.  
 **Features**: Live distance matrix, synchronized graph+matrix, interactive path queries.  
@@ -54,7 +54,7 @@ Built with **D3.js**, these self-contained HTML files can be run directly in any
 ## 🔹 Kruskal's Algorithm: Minimum Spanning Tree (MST)
 
 
-![Kruskal Visualization Screenshot](./kruskal-screenshot.gif)  
+![Kruskal Visualization Screenshot](Kruskal.gif)  
 
 **Story & Concept**: MST by forest merging, edges accepted/rejected step by step.  
 **Features**: Component-based coloring, edge list panel, forest-merging animation.  
@@ -65,7 +65,7 @@ Built with **D3.js**, these self-contained HTML files can be run directly in any
 ## 🔹 Prim's Algorithm: Minimum Spanning Tree (MST – Growth from Seed)
 
 
-![Prim Visualization Screenshot](./prim-screenshot.gif)  
+![Prim Visualization Screenshot](prim.gif)  
 
 **Story & Concept**: MST as a growing tree, starting from a seed node and expanding via cheapest frontier edge.  
 **Features**: Frontier edges visualization, live priority queue, distinct node/edge states, growth animations.  
@@ -76,7 +76,7 @@ Built with **D3.js**, these self-contained HTML files can be run directly in any
 ## 🔹 A* (A-Star) Pathfinding
 
 
-![A* Visualization Screenshot](./a-star-screenshot.gif)  
+![A* Visualization Screenshot](A-star.gif)  
 
 **Story & Concept**: A* = actual cost g(n) + heuristic h(n). Expands intelligently toward the goal.  
 **Features**: Interactive grid (walls, start/end), open/closed set visualization, heuristic-driven expansion, adjustable animation speed.  
@@ -93,7 +93,7 @@ Built with **D3.js**, these self-contained HTML files can be run directly in any
 ## 🔹 Bellman-Ford Algorithm: Negative Weights & Cycle Detection
 
 
-![Bellman-Ford Visualization Screenshot](./bellman-ford-screenshot.gif)  
+![Bellman-Ford Visualization Screenshot](Bellman-Ford .gif)  
 
 **Story & Concept**:  
 - **Iterative Refinement**: Runs `V-1` rounds of edge relaxations.  

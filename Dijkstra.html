@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dijkstra's Algorithm: The Ripple of Discovery</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+        #main-container {
+            position: relative;
+            width: 98%;
+            height: 98%;
+            background-color: #1e1e1e;
+            border-radius: 15px;
+            box-shadow: 0 0 25px rgba(0, 0, 0, 0.6 );
+        }
+        svg {
+            width: 100%;
+            height: 100%;
+            cursor: grab;
+        }
+        svg:active {
+            cursor: grabbing;
+        }
+        .controls {
+            position: absolute;
+            top: 20px;
+            left: 25px;
+            display: flex;
+            gap: 12px;
+            z-index: 10;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: 600;
+            border: 2px solid #03dac6;
+            border-radius: 8px;
+            cursor: pointer;
+            background-color: transparent;
+            color: #03dac6;
+            transition: all 0.3s ease;
+            letter-spacing: 0.5px;
+        }
+        button:hover:not(:disabled) {
+            background-color: #03dac6;
+            color: #121212;
+            box-shadow: 0 0 15px #03dac6;
+        }
+        button:disabled {
+            border-color: #444;
+            color: #444;
+            cursor: not-allowed;
+        }
+        .info-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 25px;
+            padding: 12px 18px;
+            background-color: rgba(0, 0, 0, 0.75);
+            border-radius: 8px;
+            font-size: 1.1em;
+            border: 1px solid #333;
+            z-index: 10;
+            max-width: 500px;
+        }
+        .queue-container {
+            position: absolute;
+            top: 20px;
+            right: 25px;
+            width: 220px;
+            height: 85%;
+            padding: 15px;
+            background-color: rgba(0, 0, 0, 0.75);
+            border-radius: 8px;
+            border: 1px solid #333;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+        }
+        .queue-container h3 {
+            margin: 0 0 15px 0;
+            text-align: center;
+            color: #bb86fc;
+            font-weight: 600;
+        }
+        #priority-queue {
+            flex-grow: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+        .queue-item {
+            display: flex;
+            justify-content: space-between;
+            width: 90%;
+            background-color: #373737;
+            border: 1px solid #555;
+            color: #e0e0e0;
+            padding: 6px 12px;
+            border-radius: 5px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .queue-item.popped {
+            background-color: #fdd835;
+            color: #121212;
+            transform: scale(1.1);
+        }
+        .node circle {
+            stroke: #fff;
+            stroke-width: 2px;
+            transition: all 0.3s ease;
+        }
+        .node text {
+            fill: #fff;
+            font-size: 14px;
+            pointer-events: none;
+            text-anchor: middle;
+            dominant-baseline: central;
+            font-weight: bold;
+        }
+        .link {
+            stroke: #666;
+            stroke-width: 2px;
+            transition: all 0.3s ease;
+        }
+        .link-label {
+            fill: #ccc;
+            font-size: 12px;
+            text-anchor: middle;
+            pointer-events: none;
+        }
+        .path {
+            stroke: #03dac6;
+            stroke-width: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="main-container">
+        <svg id="svg"></svg>
+        <div class="controls">
+            <button id="startBtn">Start</button>
+            <button id="resetBtn">Reset</button>
+        </div>
+        <div class="info-panel" id="info-panel">Click on a node to select it as the source, then click "Start".</div>
+        <div class="queue-container">
+            <h3>Priority Queue (Node, Distance)</h3>
+            <div id="priority-queue"></div>
+        </div>
+    </div>
+
+<script>
+    // --- D3 Setup ---
+    const svg = d3.select("svg");
+    const width = +svg.node().getBoundingClientRect().width;
+    const height = +svg.node().getBoundingClientRect().height;
+    
+    // --- UI Elements ---
+    const startBtn = document.getElementById('startBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const infoPanel = document.getElementById('info-panel');
+    const pqDiv = document.getElementById('priority-queue');
+
+    // --- Config ---
+    const NUM_NODES = 40;
+    const ANIMATION_SPEED = 400;
+
+    let nodesData, linksData, simulation, adjList;
+    let isRunning = false, sourceNode = null;
+    let zoomGroup, linkElements, nodeElements, labelElements;
+    
+    // --- Graph Generation ---
+    function generateGraph() {
+        const nodes = d3.range(NUM_NODES).map(i => ({ id: i, distance: Infinity, prev: null }));
+        const links = [];
+        const linkSet = new Set();
+
+        // Create a connected graph using a spanning tree
+        for (let i = 1; i < NUM_NODES; i++) {
+            const target = i;
+            const source = Math.floor(Math.random() * i);
+            const weight = Math.floor(Math.random() * 20) + 1;
+            links.push({ source, target, weight });
+            linkSet.add(`${source},${target}`);
+        }
+
+        // Add extra edges for complexity
+        for (let i = 0; i < NUM_NODES * 1.2; i++) {
+            const source = Math.floor(Math.random() * NUM_NODES);
+            const target = Math.floor(Math.random() * NUM_NODES);
+            if (source !== target && !linkSet.has(`${source},${target}`) && !linkSet.has(`${target},${source}`)) {
+                const weight = Math.floor(Math.random() * 20) + 1;
+                links.push({ source, target, weight });
+                linkSet.add(`${source},${target}`);
+            }
+        }
+        
+        const adj = new Map(nodes.map(n => [n.id, []]));
+        links.forEach(link => {
+            adj.get(link.source).push({ node: link.target, weight: link.weight });
+            adj.get(link.target).push({ node: link.source, weight: link.weight });
+        });
+
+        return { nodes, links, adj };
+    }
+    
+    // --- D3 Drawing & Update ---
+    function initializeVisuals() {
+        simulation = d3.forceSimulation(nodesData)
+            .force("link", d3.forceLink(linksData).id(d => d.id).distance(100).strength(0.8))
+            .force("charge", d3.forceManyBody().strength(-300))
+            .force("center", d3.forceCenter(width / 2, height / 2));
+
+        svg.html('');
+        zoomGroup = svg.append("g");
+
+        linkElements = zoomGroup.append("g").selectAll("line")
+            .data(linksData, d => `${d.source.id}-${d.target.id}`)
+            .enter().append("line")
+            .attr("class", "link");
+
+        labelElements = zoomGroup.append("g").selectAll("text")
+            .data(linksData, d => `${d.source.id}-${d.target.id}`)
+            .enter().append("text")
+            .attr("class", "link-label")
+            .text(d => d.weight);
+
+        nodeElements = zoomGroup.append("g").selectAll("g")
+            .data(nodesData, d => d.id)
+            .enter().append("g")
+            .attr("class", "node")
+            .attr("id", d => `node-${d.id}`)
+            .on("click", handleNodeClick)
+            .on("mouseenter", handleNodeMouseover)
+            .on("mouseleave", handleNodeMouseout);
+
+        nodeElements.append("circle").attr("r", 15);
+        nodeElements.append("text").text(d => d.id);
+
+        simulation.on("tick", () => {
+            linkElements
+                .attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+            labelElements
+                .attr("x", d => (d.source.x + d.target.x) / 2)
+                .attr("y", d => (d.source.y + d.target.y) / 2);
+            nodeElements.attr("transform", d => `translate(${d.x},${d.y})`);
+        });
+
+        const zoom = d3.zoom().scaleExtent([0.1, 4]).on("zoom", (event) => {
+            zoomGroup.attr("transform", event.transform);
+        });
+        svg.call(zoom);
+    }
+
+    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    // --- Dijkstra's Algorithm with Animation ---
+    async function dijkstra() {
+        if (sourceNode === null) {
+            infoPanel.textContent = "Please select a source node first!";
+            return;
+        }
+        isRunning = true;
+        startBtn.disabled = true;
+        resetBtn.disabled = true;
+
+        const pq = [{ id: sourceNode, distance: 0 }];
+        nodesData[sourceNode].distance = 0;
+        updateQueueVisuals(pq);
+
+        d3.select(`#node-${sourceNode} circle`).attr("fill", "#fdd835"); // Visiting color
+
+        while (pq.length > 0) {
+            pq.sort((a, b) => a.distance - b.distance);
+            
+            const { id: u, distance: u_dist } = pq.shift();
+            
+            // Visual feedback for popping from queue
+            const topItem = document.getElementById(`q-item-${u}`);
+            if(topItem) topItem.classList.add('popped');
+            await sleep(ANIMATION_SPEED);
+            updateQueueVisuals(pq);
+
+            if (u_dist > nodesData[u].distance) continue;
+
+            // "Finalize" the node
+            const uNode = d3.select(`#node-${u}`);
+            uNode.select("circle").transition().duration(ANIMATION_SPEED)
+                .attr("fill", "#d62728") // Visited color
+                .attr("r", 20).transition().attr("r", 15);
+            
+            infoPanel.innerHTML = `Visiting node <strong>${u}</strong>. Shortest distance found: <strong>${u_dist}</strong>.`;
+            
+            // Highlight the path to the current node
+            highlightPath(u);
+            await sleep(ANIMATION_SPEED * 2);
+
+            for (const { node: v, weight } of adjList.get(u)) {
+                if (nodesData[u].distance + weight < nodesData[v].distance) {
+                    nodesData[v].distance = nodesData[u].distance + weight;
+                    nodesData[v].prev = u;
+                    
+                    d3.select(`#node-${v} circle`).attr("fill", "#ff7f0e"); // Neighbor color
+                    
+                    const existingInPq = pq.find(item => item.id === v);
+                    if (existingInPq) {
+                        existingInPq.distance = nodesData[v].distance;
+                    } else {
+                        pq.push({ id: v, distance: nodesData[v].distance });
+                    }
+                }
+            }
+            updateQueueVisuals(pq);
+            await sleep(ANIMATION_SPEED);
+        }
+        infoPanel.innerHTML = "Finished! Hover over any node to see the shortest path from the source.";
+        isRunning = false;
+        resetBtn.disabled = false;
+    }
+
+    function updateQueueVisuals(pq) {
+        pq.sort((a, b) => a.distance - b.distance);
+        pqDiv.innerHTML = '';
+        pq.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'queue-item';
+            div.id = `q-item-${item.id}`;
+            div.innerHTML = `<span>Node: ${item.id}</span> <span>${item.distance}</span>`;
+            pqDiv.appendChild(div);
+        });
+    }
+
+    function highlightPath(targetNodeId, clear = false) {
+        linkElements.classed("path", false);
+        if (clear) return;
+
+        let currentId = targetNodeId;
+        while (currentId !== null && nodesData[currentId].prev !== null) {
+            const prevId = nodesData[currentId].prev;
+            const link = linksData.find(l => (l.source.id === currentId && l.target.id === prevId) || (l.source.id === prevId && l.target.id === currentId));
+            if (link) {
+                d3.select(linkElements.nodes().find(n => n.__data__ === link)).classed("path", true);
+            }
+            currentId = prevId;
+        }
+    }
+
+    // --- Event Handlers ---
+    function handleNodeClick(event, d) {
+        if (isRunning) return;
+        if (sourceNode !== null) {
+            d3.select(`#node-${sourceNode} circle`).attr("fill", null);
+        }
+        sourceNode = d.id;
+        d3.select(this).select("circle").attr("fill", "#bb86fc"); // Source color
+        infoPanel.innerHTML = `Source node set to <strong>${sourceNode}</strong>. Click "Start" to begin.`;
+        startBtn.disabled = false;
+    }
+
+    function handleNodeMouseover(event, d) {
+        if (isRunning || sourceNode === null) return;
+        highlightPath(d.id);
+        const dist = nodesData[d.id].distance;
+        infoPanel.innerHTML = `Shortest path to <strong>${d.id}</strong>: <strong>${dist === Infinity ? 'Unreachable' : dist}</strong>`;
+    }
+
+    function handleNodeMouseout(event, d) {
+        if (isRunning) return;
+        highlightPath(d.id, true);
+        infoPanel.innerHTML = "Hover over any node to see the shortest path from the source.";
+    }
+    
+    function reset() {
+        if (isRunning) return;
+        const graph = generateGraph();
+        nodesData = graph.nodes;
+        linksData = graph.links;
+        adjList = graph.adj;
+        
+        sourceNode = null;
+        isRunning = false;
+        startBtn.disabled = true;
+        resetBtn.disabled = false;
+        infoPanel.textContent = "Click on a node to select it as the source, then click 'Start'.";
+        pqDiv.innerHTML = '';
+        
+        initializeVisuals();
+    }
+    
+    startBtn.addEventListener('click', () => {
+        if (!isRunning) dijkstra();
+    });
+    resetBtn.addEventListener('click', reset);
+    
+    // Initial load
+    reset();
+
+</script>
+</body>
+</html>

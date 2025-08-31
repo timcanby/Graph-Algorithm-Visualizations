@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kruskal's Algorithm: Building the Minimum Spanning Tree</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+        #main-container {
+            display: flex;
+            gap: 20px;
+            width: 98%;
+            height: 98%;
+        }
+        #graph-panel {
+            flex: 3;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        #graph-container {
+            position: relative;
+            flex-grow: 1;
+            background-color: #1e1e1e;
+            border-radius: 15px;
+            box-shadow: 0 0 25px rgba(0, 0, 0, 0.6 );
+        }
+        svg {
+            width: 100%;
+            height: 100%;
+        }
+        #controls-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 10px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: 600;
+            border: 2px solid #03dac6;
+            border-radius: 8px;
+            cursor: pointer;
+            background-color: transparent;
+            color: #03dac6;
+            transition: all 0.3s ease;
+        }
+        button:hover:not(:disabled) {
+            background-color: #03dac6;
+            color: #121212;
+        }
+        button:disabled {
+            border-color: #444;
+            color: #444;
+        }
+        #info-panel {
+            font-size: 1.1em;
+            text-align: right;
+        }
+        #sidebar {
+            flex: 1;
+            padding: 20px;
+            background-color: #1e1e1e;
+            border-radius: 15px;
+            box-shadow: 0 0 25px rgba(0, 0, 0, 0.6);
+            display: flex;
+            flex-direction: column;
+        }
+        #sidebar h2 {
+            margin: 0 0 15px 0;
+            text-align: center;
+            color: #bb86fc;
+        }
+        #edge-list {
+            flex-grow: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .edge-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background-color: #373737;
+            border-radius: 5px;
+            border-left: 5px solid #666;
+            transition: all 0.3s ease;
+        }
+        .edge-item.checking {
+            border-left-color: #fdd835; /* Yellow */
+            transform: scale(1.05);
+        }
+        .edge-item.accepted {
+            border-left-color: #2ca02c; /* Green */
+            background-color: #2e7d32;
+        }
+        .edge-item.rejected {
+            border-left-color: #d62728; /* Red */
+            background-color: #c62828;
+            opacity: 0.6;
+        }
+        .node circle { stroke: #fff; stroke-width: 2px; transition: fill 0.5s ease; }
+        .node text { fill: #fff; font-size: 14px; pointer-events: none; text-anchor: middle; dominant-baseline: central; font-weight: bold; }
+        .link { stroke: #666; stroke-width: 2px; transition: all 0.3s ease; }
+        .link-label { fill: #ccc; font-size: 12px; text-anchor: middle; pointer-events: none; }
+        .mst-edge { stroke: #03dac6; stroke-width: 5px; }
+    </style>
+</head>
+<body>
+    <div id="main-container">
+        <div id="graph-panel">
+            <div id="graph-container">
+                <svg id="svg"></svg>
+            </div>
+            <div id="controls-info">
+                <div class="controls">
+                    <button id="startBtn">Start</button>
+                    <button id="resetBtn">Reset</button>
+                </div>
+                <div id="info-panel">Ready to build the Minimum Spanning Tree.</div>
+            </div>
+        </div>
+        <div id="sidebar">
+            <h2>Sorted Edge List</h2>
+            <div id="edge-list"></div>
+        </div>
+    </div>
+
+<script>
+    // --- D3 Setup & UI ---
+    const svg = d3.select("svg");
+    const startBtn = document.getElementById('startBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const infoPanel = document.getElementById('info-panel');
+    const edgeListDiv = document.getElementById('edge-list');
+
+    // --- Config ---
+    const NUM_NODES = 20;
+    const ANIMATION_SPEED = 500;
+
+    let nodesData, linksData, simulation, sortedEdges;
+    let isRunning = false;
+    let componentColors;
+    let linkElements, nodeElements, labelElements;
+    
+    // --- Graph Generation ---
+    function generateGraph() {
+        const nodes = d3.range(NUM_NODES).map(i => ({ id: i }));
+        const links = [];
+        const linkSet = new Set();
+
+        // Ensure connectivity with a spanning tree
+        for (let i = 1; i < NUM_NODES; i++) {
+            const targetId = i;
+            const sourceId = Math.floor(Math.random() * i);
+            const weight = Math.floor(Math.random() * 20) + 1;
+            // *** FIX: Push node objects, not just IDs ***
+            links.push({ source: nodes[sourceId], target: nodes[targetId], weight });
+            linkSet.add(`${sourceId},${targetId}`);
+        }
+
+        // Add more edges for complexity
+        for (let i = 0; i < NUM_NODES * 1.5; i++) {
+            const sourceId = Math.floor(Math.random() * NUM_NODES);
+            const targetId = Math.floor(Math.random() * NUM_NODES);
+            const key1 = `${sourceId},${targetId}`;
+            const key2 = `${targetId},${sourceId}`;
+            if (sourceId !== targetId && !linkSet.has(key1) && !linkSet.has(key2)) {
+                const weight = Math.floor(Math.random() * 20) + 1;
+                // *** FIX: Push node objects, not just IDs ***
+                links.push({ source: nodes[sourceId], target: nodes[targetId], weight });
+                linkSet.add(key1);
+            }
+        }
+        return { nodes, links };
+    }
+    
+    // --- D3 Drawing ---
+    function initializeVisuals() {
+        const { clientWidth: width, clientHeight: height } = document.getElementById('graph-container');
+        simulation = d3.forceSimulation(nodesData)
+            .force("link", d3.forceLink(linksData).id(d => d.id).distance(90).strength(0.5))
+            .force("charge", d3.forceManyBody().strength(-300))
+            .force("center", d3.forceCenter(width / 2, height / 2));
+
+        svg.html('');
+        const zoomGroup = svg.append("g");
+
+        linkElements = zoomGroup.append("g").selectAll("line").data(linksData).enter().append("line")
+            .attr("class", "link")
+            .attr("id", d => `link-${Math.min(d.source.id, d.target.id)}-${Math.max(d.source.id, d.target.id)}`);
+            
+        labelElements = zoomGroup.append("g").selectAll("text").data(linksData).enter().append("text")
+            .attr("class", "link-label")
+            .text(d => d.weight);
+            
+        nodeElements = zoomGroup.append("g").selectAll("g").data(nodesData).enter().append("g")
+            .attr("class", "node")
+            .attr("id", d => `node-${d.id}`);
+        
+        nodeElements.append("circle").attr("r", 12).attr("fill", d => componentColors[d.id]);
+        nodeElements.append("text").text(d => d.id);
+
+        simulation.on("tick", () => {
+            linkElements.attr("x1", d => d.source.x).attr("y1", d => d.source.y).attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+            labelElements.attr("x", d => (d.source.x + d.target.x) / 2).attr("y", d => (d.source.y + d.target.y) / 2);
+            nodeElements.attr("transform", d => `translate(${d.x},${d.y})`);
+        });
+    }
+
+    // --- Disjoint Set Union (DSU) ---
+    class DSU {
+        constructor(n) { this.parent = Array.from({length: n}, (_, i) => i); }
+        find(i) {
+            if (this.parent[i] === i) return i;
+            return this.parent[i] = this.find(this.parent[i]);
+        }
+        union(i, j) {
+            const rootI = this.find(i);
+            const rootJ = this.find(j);
+            if (rootI !== rootJ) {
+                this.parent[rootJ] = rootI;
+                return true;
+            }
+            return false;
+        }
+    }
+
+    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    // --- Kruskal's Algorithm ---
+    async function kruskal() {
+        isRunning = true;
+        startBtn.disabled = true;
+        resetBtn.disabled = true;
+
+        const dsu = new DSU(NUM_NODES);
+        let mstCost = 0;
+        let mstEdges = 0;
+
+        for (const edge of sortedEdges) {
+            if (mstEdges === NUM_NODES - 1) break;
+
+            const { source, target, weight } = edge;
+            const edgeListItem = document.getElementById(`edge-item-${source.id}-${target.id}`);
+            edgeListItem.classList.add('checking');
+            infoPanel.innerHTML = `Checking edge (<strong>${source.id}</strong>, <strong>${target.id}</strong>) with weight <strong>${weight}</strong>...`;
+            
+            const uRoot = dsu.find(source.id);
+            const vRoot = dsu.find(target.id);
+
+            await sleep(ANIMATION_SPEED * 1.5);
+
+            if (uRoot !== vRoot) {
+                // Accept the edge
+                dsu.union(source.id, target.id);
+                mstCost += weight;
+                mstEdges++;
+                
+                edgeListItem.classList.remove('checking');
+                edgeListItem.classList.add('accepted');
+                infoPanel.innerHTML = `<strong>Accepted!</strong> Cost: ${mstCost}`;
+                
+                const linkId = `link-${Math.min(source.id, target.id)}-${Math.max(source.id, target.id)}`;
+                d3.select(`line[id="${linkId}"]`).classed("mst-edge", true);
+
+                // Animate component merge
+                const newColor = componentColors[uRoot];
+                for(let i = 0; i < NUM_NODES; i++) {
+                    if(dsu.find(i) === uRoot) {
+                        componentColors[i] = newColor;
+                    }
+                }
+                nodeElements.selectAll("circle").transition().duration(ANIMATION_SPEED).attr("fill", d => componentColors[dsu.find(d.id)]);
+
+            } else {
+                // Reject the edge
+                edgeListItem.classList.remove('checking');
+                edgeListItem.classList.add('rejected');
+                infoPanel.innerHTML = `<strong>Rejected!</strong> Edge (<strong>${source.id}</strong>, <strong>${target.id}</strong>) would form a cycle.`;
+                
+                const linkId = `link-${Math.min(source.id, target.id)}-${Math.max(source.id, target.id)}`;
+                const rejectedLink = d3.select(`line[id="${linkId}"]`);
+                rejectedLink.transition().duration(ANIMATION_SPEED/2).attr("stroke", "#d62728").attr("stroke-width", 5)
+                    .transition().duration(ANIMATION_SPEED/2).attr("stroke", "#444").attr("stroke-width", 1);
+            }
+            await sleep(ANIMATION_SPEED * 1.5);
+        }
+        infoPanel.innerHTML = `<strong>Finished!</strong> Minimum Spanning Tree Cost: <strong>${mstCost}</strong>`;
+        isRunning = false;
+        resetBtn.disabled = false;
+    }
+
+    // --- Control Logic ---
+    function reset() {
+        if (isRunning) return;
+        const graph = generateGraph();
+        nodesData = graph.nodes;
+        linksData = graph.links;
+        
+        sortedEdges = [...linksData].sort((a, b) => a.weight - b.weight);
+        
+        componentColors = d3.quantize(t => d3.interpolateRainbow(t), NUM_NODES + 1);
+        
+        edgeListDiv.innerHTML = '';
+        sortedEdges.forEach(edge => {
+            const div = document.createElement('div');
+            div.className = 'edge-item';
+            div.id = `edge-item-${edge.source.id}-${edge.target.id}`;
+            div.innerHTML = `<span>Edge: (${edge.source.id}, ${edge.target.id})</span> <span>Weight: ${edge.weight}</span>`;
+            edgeListDiv.appendChild(div);
+        });
+
+        initializeVisuals();
+        
+        infoPanel.textContent = "Ready to build the Minimum Spanning Tree.";
+        startBtn.disabled = false;
+        resetBtn.disabled = false;
+    }
+    
+    startBtn.addEventListener('click', () => { if (!isRunning) kruskal(); });
+    resetBtn.addEventListener('click', reset);
+    
+    // Initial load
+    reset();
+
+</script>
+</body>
+</html>
+

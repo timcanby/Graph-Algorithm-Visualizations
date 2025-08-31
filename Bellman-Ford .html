@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bellman-Ford: Handling the Negative</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+        #main-container {
+            display: flex;
+            gap: 20px;
+            width: 98%;
+            height: 98%;
+        }
+        #graph-panel {
+            flex: 3;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        #graph-container {
+            position: relative;
+            flex-grow: 1;
+            background-color: #1e1e1e;
+            border-radius: 15px;
+            box-shadow: 0 0 25px rgba(0, 0, 0, 0.6 );
+        }
+        svg { width: 100%; height: 100%; }
+        #controls-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 10px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: 600;
+            border: 2px solid #03dac6;
+            border-radius: 8px;
+            cursor: pointer;
+            background-color: transparent;
+            color: #03dac6;
+            transition: all 0.3s ease;
+        }
+        button:hover:not(:disabled) { background-color: #03dac6; color: #121212; }
+        button:disabled { border-color: #444; color: #444; }
+        #info-panel { font-size: 1.1em; text-align: right; }
+        #sidebar {
+            flex: 1;
+            padding: 20px;
+            background-color: #1e1e1e;
+            border-radius: 15px;
+            box-shadow: 0 0 25px rgba(0, 0, 0, 0.6);
+            display: flex;
+            flex-direction: column;
+        }
+        #sidebar h2 { margin: 0 0 15px 0; text-align: center; color: #bb86fc; }
+        #distance-list {
+            flex-grow: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .dist-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background-color: #373737;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+        }
+        .dist-item.updated {
+            animation: flash-update 0.8s ease;
+        }
+        @keyframes flash-update {
+            0%, 100% { background-color: #2ca02c; }
+            50% { background-color: #fff; color: black; transform: scale(1.05); }
+        }
+        .node circle { stroke: #fff; stroke-width: 2px; transition: all 0.3s ease; }
+        .node text.label { fill: #fff; font-size: 14px; pointer-events: none; text-anchor: middle; dominant-baseline: central; font-weight: bold; }
+        .node text.dist-label { fill: #fdd835; font-size: 12px; pointer-events: none; text-anchor: middle; dominant-baseline: hanging; transform: translateY(15px); }
+        .link { stroke: #666; stroke-width: 2px; transition: all 0.3s ease; }
+        .link-label { fill: #ccc; font-size: 12px; text-anchor: middle; pointer-events: none; }
+        .negative-weight { fill: #d62728; font-weight: bold; }
+        .relaxing-edge { stroke: #fdd835; stroke-width: 5px; }
+        .negative-cycle { animation: flash-cycle 1s infinite; }
+        @keyframes flash-cycle {
+            50% { stroke: #d62728; stroke-width: 6px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="main-container">
+        <div id="graph-panel">
+            <div id="graph-container">
+                <svg id="svg"></svg>
+            </div>
+            <div id="controls-info">
+                <div class="controls">
+                    <button id="startBtn">Start</button>
+                    <button id="resetBtn">Reset</button>
+                </div>
+                <div id="info-panel">Ready to find the shortest paths.</div>
+            </div>
+        </div>
+        <div id="sidebar">
+            <h2>Distances from Source</h2>
+            <div id="distance-list"></div>
+        </div>
+    </div>
+
+<script>
+    // --- D3 Setup & UI ---
+    const svg = d3.select("svg");
+    const startBtn = document.getElementById('startBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const infoPanel = document.getElementById('info-panel');
+    const distanceListDiv = document.getElementById('distance-list');
+
+    // --- Config ---
+    const NUM_NODES = 10;
+    const ANIMATION_SPEED = 200;
+
+    let nodesData, linksData, simulation;
+    let isRunning = false;
+    
+    // --- Graph Generation ---
+    function generateGraph() {
+        const nodes = d3.range(NUM_NODES).map(i => ({ id: i }));
+        const links = [];
+        const linkSet = new Set();
+
+        // Directed graph
+        for (let i = 0; i < NUM_NODES * 1.8; i++) {
+            const sourceId = Math.floor(Math.random() * NUM_NODES);
+            const targetId = Math.floor(Math.random() * NUM_NODES);
+            if (sourceId !== targetId && !linkSet.has(`${sourceId},${targetId}`)) {
+                // Introduce negative weights
+                const weight = Math.random() < 0.2 ? -(Math.floor(Math.random() * 5) + 1) : Math.floor(Math.random() * 10) + 1;
+                links.push({ source: nodes[sourceId], target: nodes[targetId], weight });
+                linkSet.add(`${sourceId},${targetId}`);
+            }
+        }
+        // Optional: Manually add a negative cycle for demonstration
+        // links.push({ source: nodes[1], target: nodes[2], weight: 2 });
+        // links.push({ source: nodes[2], target: nodes[3], weight: 3 });
+        // links.push({ source: nodes[3], target: nodes[1], weight: -6 });
+
+        return { nodes, links };
+    }
+    
+    // --- D3 Drawing ---
+    function initializeVisuals() {
+        const { clientWidth: width, clientHeight: height } = document.getElementById('graph-container');
+        simulation = d3.forceSimulation(nodesData)
+            .force("link", d3.forceLink(linksData).id(d => d.id).distance(120))
+            .force("charge", d3.forceManyBody().strength(-500))
+            .force("center", d3.forceCenter(width / 2, height / 2));
+
+        svg.html('');
+        const zoomGroup = svg.append("g");
+        
+        svg.append('defs').append('marker').attr('id', 'arrowhead').attr('viewBox', '-0 -5 10 10')
+            .attr('refX', 25).attr('refY', 0).attr('orient', 'auto').attr('markerWidth', 6).attr('markerHeight', 6)
+            .append('svg:path').attr('d', 'M 0,-5 L 10 ,0 L 0,5').attr('fill', '#666');
+
+        const linkGroup = zoomGroup.append("g").selectAll("g").data(linksData).enter().append("g");
+        linkGroup.append("line").attr("class", "link").attr('marker-end', 'url(#arrowhead)');
+        linkGroup.append("text").attr("class", "link-label").text(d => d.weight).classed("negative-weight", d => d.weight < 0);
+
+        const nodeGroup = zoomGroup.append("g").selectAll("g").data(nodesData).enter().append("g").attr("class", "node");
+        nodeGroup.append("circle").attr("r", 15).attr("fill", "#444");
+        nodeGroup.append("text").attr("class", "label").text(d => d.id);
+        nodeGroup.append("text").attr("class", "dist-label").attr("id", d => `dist-label-${d.id}`);
+
+        simulation.on("tick", () => {
+            linkGroup.select("line").attr("x1", d => d.source.x).attr("y1", d => d.source.y).attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+            linkGroup.select("text").attr("x", d => (d.source.x + d.target.x) / 2).attr("y", d => (d.source.y + d.target.y) / 2);
+            nodeGroup.attr("transform", d => `translate(${d.x},${d.y})`);
+        });
+    }
+
+    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    // --- Bellman-Ford Algorithm ---
+    async function bellmanFord() {
+        isRunning = true;
+        startBtn.disabled = true;
+        resetBtn.disabled = true;
+
+        const source = 0;
+        let distances = Array(NUM_NODES).fill(Infinity);
+        let predecessors = Array(NUM_NODES).fill(null);
+        distances[source] = 0;
+
+        updateDistanceVisuals(distances);
+        d3.select(`#node-${source} circle`).attr("fill", "#03dac6");
+
+        // Step 2: Relax edges repeatedly
+        for (let i = 1; i < NUM_NODES; i++) {
+            infoPanel.innerHTML = `Relaxation Iteration: <strong>${i} / ${NUM_NODES - 1}</strong>`;
+            let relaxedInIteration = false;
+            for (const edge of linksData) {
+                const u = edge.source.id;
+                const v = edge.target.id;
+                const weight = edge.weight;
+
+                const linkLine = d3.select(svg.selectAll(".link").nodes()[linksData.indexOf(edge)]);
+                linkLine.classed("relaxing-edge", true);
+                await sleep(ANIMATION_SPEED);
+
+                if (distances[u] !== Infinity && distances[u] + weight < distances[v]) {
+                    distances[v] = distances[u] + weight;
+                    predecessors[v] = u;
+                    relaxedInIteration = true;
+                    updateDistanceVisuals(distances, v);
+                }
+                linkLine.classed("relaxing-edge", false);
+            }
+            if (!relaxedInIteration) {
+                infoPanel.textContent = `No paths improved in iteration ${i}. Early exit.`;
+                await sleep(ANIMATION_SPEED * 5);
+                break;
+            }
+        }
+
+        // Step 3: Check for negative-weight cycles
+        infoPanel.textContent = "Checking for negative-weight cycles...";
+        await sleep(ANIMATION_SPEED * 10);
+        for (const edge of linksData) {
+            const u = edge.source.id;
+            const v = edge.target.id;
+            const weight = edge.weight;
+            if (distances[u] !== Infinity && distances[u] + weight < distances[v]) {
+                infoPanel.innerHTML = `<strong style="color: #d62728;">Negative-weight cycle detected!</strong> Shortest paths are not well-defined.`;
+                
+                // Highlight the cycle
+                let cycleNode = v;
+                const cycleSet = new Set();
+                for(let i=0; i<NUM_NODES; i++) { cycleNode = predecessors[cycleNode]; }
+                
+                let current = cycleNode;
+                while(!cycleSet.has(current)) {
+                    cycleSet.add(current);
+                    d3.select(`#node-${current} circle`).classed("negative-cycle", true);
+                    current = predecessors[current];
+                }
+                cycleSet.add(current); // Add start of cycle to close loop
+                
+                linksData.forEach((l, idx) => {
+                    if(cycleSet.has(l.source.id) && cycleSet.has(l.target.id) && predecessors[l.target.id] === l.source.id) {
+                        d3.select(svg.selectAll(".link").nodes()[idx]).classed("negative-cycle", true);
+                    }
+                });
+
+                isRunning = false;
+                resetBtn.disabled = false;
+                return;
+            }
+        }
+
+        infoPanel.textContent = "Finished! No negative cycles found.";
+        isRunning = false;
+        resetBtn.disabled = false;
+    }
+
+    function updateDistanceVisuals(distances, updatedNode = null) {
+        distanceListDiv.innerHTML = '';
+        distances.forEach((dist, i) => {
+            const val = dist === Infinity ? '∞' : dist;
+            d3.select(`#dist-label-${i}`).text(val);
+            
+            const div = document.createElement('div');
+            div.className = 'dist-item';
+            if (i === updatedNode) div.classList.add('updated');
+            div.innerHTML = `<span>Node: ${i}</span> <span>${val}</span>`;
+            distanceListDiv.appendChild(div);
+        });
+    }
+
+    // --- Control Logic ---
+    function reset() {
+        if (isRunning) return;
+        const graph = generateGraph();
+        nodesData = graph.nodes;
+        linksData = graph.links;
+        
+        initializeVisuals();
+        updateDistanceVisuals(Array(NUM_NODES).fill('...'));
+        
+        infoPanel.textContent = "Ready to find the shortest paths.";
+        startBtn.disabled = false;
+        resetBtn.disabled = false;
+    }
+    
+    startBtn.addEventListener('click', () => { if (!isRunning) bellmanFord(); });
+    resetBtn.addEventListener('click', reset);
+    
+    // Initial load
+    reset();
+
+</script>
+</body>
+</html>

@@ -9,7 +9,6 @@
 
 **An interactive collection of graph algorithm visualizations that bring computer science concepts to life**
 
-[🚀 Quick Start](#-quick-start) • [📚 Algorithms](#-algorithms) • [🎯 Features](#-features) • [💻 Demo](#-demo) • [🤝 Contributing](#-contributing)
 
 </div>
 
@@ -20,25 +19,6 @@
 Graph Algorithm Visualizations is a comprehensive educational toolkit designed to make complex graph algorithms accessible and intuitive through interactive web-based visualizations. Each algorithm is presented not merely as a sequence of computational steps, but as a compelling story that reveals the underlying logic and mathematical beauty of these fundamental computer science concepts.
 
 Built entirely with modern web technologies including D3.js, HTML5, CSS3, and ES6+ JavaScript, this project delivers self-contained visualizations that require no installation, no server setup, and no external dependencies. Simply open any HTML file in your browser and begin exploring the fascinating world of graph algorithms.
-
-### 🎯 Educational Philosophy
-
-This project is founded on the principle that **visualization enhances understanding**. Rather than presenting algorithms as abstract mathematical formulations, each visualization tells a story:
-
-- **Dijkstra's Algorithm** becomes a "ripple of discovery" spreading across the graph
-- **Prim's Algorithm** transforms into organic "growth from a seed" 
-- **Kosaraju's Algorithm** reveals the hidden structure through "tangled web → reversal → discovery"
-- **A* Pathfinding** demonstrates intelligent exploration guided by heuristic intuition
-
-### 🌟 Why This Project Matters
-
-Graph algorithms form the backbone of countless real-world applications, from GPS navigation and social network analysis to compiler optimization and network routing. However, these algorithms are often taught through static diagrams and pseudocode that fail to capture their dynamic nature. This project bridges that gap by providing:
-
-- **Immediate Visual Feedback**: See algorithms in action with real-time animations
-- **Interactive Exploration**: Experiment with different graph configurations and parameters
-- **Intuitive Understanding**: Grasp the "why" behind each algorithmic decision
-- **Accessible Learning**: No programming knowledge required to understand the concepts
-
 
 
 ## 🚀 Quick Start
@@ -213,73 +193,6 @@ Each visualization is crafted with careful attention to visual design principles
 **Responsive Feedback**: Immediate visual response to user interactions, making the experience feel fluid and engaging rather than static and predetermined.
 
 
-### 🎓 Educational Integration
-
-**Classroom Ready**: Designed specifically for educational use:
-- **Self-Contained**: Each file includes everything needed for a complete lesson
-- **Projection Friendly**: High contrast and large elements work well on projectors
-- **Discussion Points**: Visual elements naturally create opportunities for classroom discussion
-- **Progressive Complexity**: Algorithms are ordered from simpler concepts to more advanced topics
-
-**Self-Directed Learning**: Comprehensive enough for independent study:
-- **Intuitive Interface**: No manual required – controls are discoverable and logical
-- **Multiple Learning Styles**: Visual, kinesthetic, and analytical learners all benefit
-- **Immediate Feedback**: Mistakes and corrections are immediately visible
-- **Exploration Encouraged**: Safe environment for experimentation and "what if" scenarios
-
-
-## 💻 Technical Implementation
-
-### 🏗️ Architecture Overview
-
-This project follows a **self-contained architecture** philosophy where each visualization is a complete, standalone application. This design choice provides several key benefits:
-
-**Zero Dependencies**: Each HTML file includes all necessary code, stylesheets, and libraries inline. This eliminates version conflicts, reduces complexity, and ensures long-term accessibility.
-
-**Immediate Execution**: No build process, no package management, no server setup. Simply open any file in a browser and the visualization is ready to use.
-
-**Educational Transparency**: Students and educators can view the complete source code for any algorithm by simply viewing the page source, making this an excellent resource for learning web development alongside algorithm concepts.
-
-### 🛠️ Technology Stack
-
-**D3.js (Data-Driven Documents)**: The visualization engine that powers all animations and interactions. D3.js was chosen for its:
-- **Powerful Data Binding**: Seamlessly connects algorithm state to visual elements
-- **Smooth Animations**: Built-in transition system for fluid, professional animations
-- **SVG Manipulation**: Vector graphics ensure crisp visuals at any zoom level
-- **Event Handling**: Robust system for user interactions and real-time updates
-
-**Modern JavaScript (ES6+)**: Leverages contemporary JavaScript features for clean, maintainable code:
-- **Classes and Modules**: Object-oriented design for algorithm implementations
-- **Arrow Functions**: Concise syntax for event handlers and callbacks
-- **Template Literals**: Dynamic string generation for UI updates
-- **Async/Await**: Smooth animation timing and user interaction handling
-
-**CSS3 Advanced Features**: Modern styling techniques for polished visual design:
-- **Flexbox and Grid**: Responsive layouts that adapt to different screen sizes
-- **CSS Animations**: Complementary animations that work alongside D3.js
-- **Custom Properties**: Consistent theming and easy customization
-- **Media Queries**: Mobile-responsive design patterns
-
-**HTML5 Semantic Elements**: Proper document structure for accessibility and SEO:
-- **Semantic Markup**: Screen reader friendly for accessibility
-- **Canvas and SVG**: Hybrid approach using the best tool for each visualization need
-- **Form Controls**: Intuitive user interface elements for algorithm parameters
-
-### 📊 Performance Optimization
-
-**Efficient Rendering**: Each visualization is optimized for smooth performance:
-- **Selective Updates**: Only modified elements are re-rendered during animations
-- **Optimized Data Structures**: Algorithm implementations use appropriate data structures for performance
-- **Memory Management**: Careful cleanup of event listeners and animation timers
-- **Lazy Loading**: Complex calculations are performed only when needed
-
-**Scalability Considerations**: Visualizations handle various graph sizes gracefully:
-- **Adaptive Layouts**: Interface elements scale appropriately with graph complexity
-- **Performance Warnings**: User feedback when operations might be slow on large graphs
-- **Configurable Timing**: Animation speeds can be adjusted for different hardware capabilities
-
----
-
 ## 📖 Usage Guide
 
 ### 🎯 For Educators
@@ -345,46 +258,7 @@ This project follows a **self-contained architecture** philosophy where each vis
 3. **Notice** how Kruskal considers edges globally while Prim grows from a single point
 4. **Observe** the different intermediate states – Kruskal creates a forest that merges, while Prim maintains a single connected component
 
----
 
-
-## 📄 License
-
-This project is released under the **MIT License**, ensuring maximum accessibility and reusability for educational purposes.
-
-### What This Means for You
-
-**Educational Use**: Free to use in any educational context, from K-12 classrooms to university courses to corporate training programs.
-
-**Modification Rights**: You can adapt, modify, and customize these visualizations for your specific needs without restriction.
-
-**Distribution Freedom**: Share these visualizations freely, whether in their original form or as part of larger educational packages.
-
-**Commercial Use**: While primarily designed for education, the MIT license allows commercial use if you find applications in training, consulting, or educational product development.
-
-### Attribution
-
-While not required by the license, we appreciate attribution when you use these visualizations in presentations, courses, or derivative works. A simple mention of "Graph Algorithm Visualizations by timcanby" helps others discover this resource.
-
----
-
-## 🙏 Acknowledgments
-
-This project builds upon the foundational work of countless computer scientists, educators, and open-source contributors who have made algorithm education accessible and engaging.
-
-**Special Recognition**:
-- **D3.js Community**: For creating and maintaining the powerful visualization library that makes these interactive experiences possible
-- **Algorithm Pioneers**: The computer scientists who developed these fundamental algorithms and made them freely available to the world
-- **Educational Technology Advocates**: Researchers and practitioners who have demonstrated the power of visualization in STEM education
-- **Open Source Contributors**: The global community that makes collaborative educational resource development possible
-
-**Inspiration Sources**:
-- **Academic Visualization Research**: Studies showing the effectiveness of animated algorithm visualization in computer science education
-- **Interactive Learning Platforms**: Existing educational tools that demonstrate best practices in user interface design for learning
-- **Algorithm Textbooks**: Classic computer science texts that provide the theoretical foundation for these implementations
-
-
----
 
 <div align="center">
 

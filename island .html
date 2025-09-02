@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Number of Islands Algorithm Visualization</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f4f7f6;
+            color: #333;
+        }
+        h1, h2 {
+            color: #2c3e50;
+        }
+        .controls {
+            margin: 20px;
+            padding: 15px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+        .controls button {
+            padding: 10px 15px;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            background-color: #3498db;
+            color: white;
+            transition: background-color 0.3s;
+        }
+        .controls button:hover {
+            background-color: #2980b9;
+        }
+        .controls button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .visualization-container {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            width: 100%;
+        }
+        .algorithm-box {
+            text-align: center;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .grid-svg {
+            border: 1px solid #ccc;
+        }
+        .cell {
+            stroke: #ddd;
+            stroke-width: 0.5;
+        }
+        .water { fill: #ecf0f1; }
+        .land { fill: #27ae60; }
+        .visiting { fill: #f1c40f; transition: fill 0.2s; }
+        .visited { fill: #2ecc71; transition: fill 0.3s; }
+
+        .explanations {
+            margin-top: 30px;
+            padding: 20px;
+            width: 90%;
+            max-width: 1200px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        th {
+            background-color: #e8f4f8;
+            color: #2c3e50;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .pros { color: #27ae60; }
+        .cons { color: #c0392b; }
+    </style>
+</head>
+<body>
+
+    <h1>Number of Islands Visualization</h1>
+
+    <div class="controls">
+        <button id="reset-btn">New Grid</button>
+        <button id="start-btn">Start Visualization</button>
+        <div class="slider-container">
+            <label for="speed-slider">Speed:</label>
+            <input type="range" id="speed-slider" min="10" max="500" value="100" step="10">
+        </div>
+    </div>
+
+    <div class="visualization-container">
+        <div class="algorithm-box">
+            <h2>DFS (Depth-First Search)</h2>
+            <div id="dfs-vis"></div>
+            <p>Islands Found: <span id="dfs-count">0</span></p>
+        </div>
+        <div class="algorithm-box">
+            <h2>BFS (Breadth-First Search)</h2>
+            <div id="bfs-vis"></div>
+            <p>Islands Found: <span id="bfs-count">0</span></p>
+        </div>
+        <div class="algorithm-box">
+            <h2>Union-Find</h2>
+            <div id="union-find-vis"></div>
+            <p>Islands Found: <span id="union-find-count">0</span></p>
+        </div>
+    </div>
+
+    <div class="explanations">
+        <h2>Algorithm Comparison</h2>
+        <p>The "Number of Islands" is a classic graph problem about counting connected components. Here's how the three approaches compare:</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Method</th>
+                    <th>Time Complexity</th>
+                    <th>Space Complexity</th>
+                    <th>Pros</th>
+                    <th>Cons</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>DFS (Recursive)</strong></td>
+                    <td>O(M * N)</td>
+                    <td>O(M * N)</td>
+                    <td class="pros">Code is often simpler and more concise.</td>
+                    <td class="cons">Can lead to a stack overflow error on very large or deep islands.</td>
+                </tr>
+                <tr>
+                    <td><strong>BFS (Iterative)</strong></td>
+                    <td>O(M * N)</td>
+                    <td>O(min(M, N))</td>
+                    <td class="pros">Avoids stack overflow. Generally more memory-efficient for wide, sprawling grids.</td>
+                    <td class="cons">Code can be slightly more complex due to the need for a queue.</td>
+                </tr>
+                <tr>
+                    <td><strong>Union-Find</strong></td>
+                    <td>O(M * N * α(M*N))</td>
+                    <td>O(M * N)</td>
+                    <td class="pros">Very efficient. Useful for problems involving dynamic connectivity.</td>
+                    <td class="cons">More complex to implement. Higher constant overhead than DFS/BFS.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+<script>
+    const GRID_SIZE = 15;
+    const CELL_SIZE = 25;
+    const SVG_WIDTH = GRID_SIZE * CELL_SIZE;
+    const SVG_HEIGHT = GRID_SIZE * CELL_SIZE;
+
+    let gridData = [];
+    let animationSpeed = 100;
+    let isRunning = false;
+    
+    // --- UTILITY FUNCTIONS ---
+    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+    const startBtn = document.getElementById('start-btn');
+    const resetBtn = document.getElementById('reset-btn');
+    const speedSlider = document.getElementById('speed-slider');
+
+    // --- GRID GENERATION ---
+    function generateGrid() {
+        gridData = [];
+        for (let i = 0; i < GRID_SIZE; i++) {
+            const row = [];
+            for (let j = 0; j < GRID_SIZE; j++) {
+                row.push(Math.random() > 0.65 ? '1' : '0');
+            }
+            gridData.push(row);
+        }
+    }
+
+    // --- D3 VISUALIZATION SETUP ---
+    function createGrid(selector) {
+        return d3.select(selector)
+            .append("svg")
+            .attr("width", SVG_WIDTH)
+            .attr("height", SVG_HEIGHT)
+            .attr("class", "grid-svg");
+    }
+
+    function drawGrid(svg, data) {
+        svg.selectAll("*").remove();
+        const flatData = data.flat().map((d, i) => ({
+            value: d,
+            row: Math.floor(i / GRID_SIZE),
+            col: i % GRID_SIZE
+        }));
+
+        svg.selectAll(".cell")
+            .data(flatData)
+            .enter()
+            .append("rect")
+            .attr("class", d => `cell r${d.row}c${d.col} ${d.value === '1' ? 'land' : 'water'}`)
+            .attr("x", d => d.col * CELL_SIZE)
+            .attr("y", d => d.row * CELL_SIZE)
+            .attr("width", CELL_SIZE)
+            .attr("height", CELL_SIZE);
+    }
+    
+    function updateCellColor(selector, row, col, newClass, color = null) {
+        const cell = d3.select(`${selector} .r${row}c${col}`);
+        cell.attr('class', `cell r${row}c${col} ${newClass}`);
+        if(color) {
+            cell.style('fill', color);
+        }
+    }
+    
+    function updateIslandCount(selector, count) {
+        document.querySelector(selector).textContent = count;
+    }
+
+    // --- ALGORITHM IMPLEMENTATIONS ---
+
+    // 1. DFS (Depth-First Search)
+    async function visualizeDFS() {
+        let count = 0;
+        const grid = gridData.map(row => [...row]); // Deep copy
+        const m = grid.length;
+        const n = grid[0].length;
+
+        async function dfs(i, j) {
+            if (i < 0 || i >= m || j < 0 || j >= n || grid[i][j] !== '1') {
+                return;
+            }
+            grid[i][j] = '0'; // Mark as visited in logic grid
+            updateCellColor('#dfs-vis', i, j, 'visiting');
+            await sleep(animationSpeed);
+            
+            await dfs(i + 1, j);
+            await dfs(i - 1, j);
+            await dfs(i, j + 1);
+            await dfs(i, j - 1);
+            
+            updateCellColor('#dfs-vis', i, j, 'visited');
+        }
+
+        for (let i = 0; i < m; i++) {
+            for (let j = 0; j < n; j++) {
+                if (grid[i][j] === '1') {
+                    count++;
+                    updateIslandCount('#dfs-count', count);
+                    await dfs(i, j);
+                }
+            }
+        }
+    }
+
+    // 2. BFS (Breadth-First Search)
+    async function visualizeBFS() {
+        let count = 0;
+        const grid = gridData.map(row => [...row]); // Deep copy
+        const m = grid.length;
+        const n = grid[0].length;
+        const queue = [];
+
+        for (let i = 0; i < m; i++) {
+            for (let j = 0; j < n; j++) {
+                if (grid[i][j] === '1') {
+                    count++;
+                    updateIslandCount('#bfs-count', count);
+                    grid[i][j] = '0';
+                    queue.push([i, j]);
+                    updateCellColor('#bfs-vis', i, j, 'visiting');
+                    await sleep(animationSpeed);
+                    
+                    while (queue.length > 0) {
+                        const [r, c] = queue.shift();
+                        updateCellColor('#bfs-vis', r, c, 'visited');
+                        
+                        const directions = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+                        for (const [dr, dc] of directions) {
+                            const newR = r + dr;
+                            const newC = c + dc;
+                            if (newR >= 0 && newR < m && newC >= 0 && newC < n && grid[newR][newC] === '1') {
+                                grid[newR][newC] = '0';
+                                queue.push([newR, newC]);
+                                updateCellColor('#bfs-vis', newR, newC, 'visiting');
+                                await sleep(animationSpeed);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. Union-Find
+    class UnionFind {
+        constructor(grid) {
+            this.parent = {};
+            this.count = 0;
+            const m = grid.length;
+            const n = grid[0].length;
+            for (let i = 0; i < m; i++) {
+                for (let j = 0; j < n; j++) {
+                    if (grid[i][j] === '1') {
+                        const id = i * n + j;
+                        this.parent[id] = id;
+                        this.count++;
+                    }
+                }
+            }
+        }
+        find(i) {
+            if (this.parent[i] === i) return i;
+            this.parent[i] = this.find(this.parent[i]); // Path compression
+            return this.parent[i];
+        }
+        union(i, j) {
+            const rootI = this.find(i);
+            const rootJ = this.find(j);
+            if (rootI !== rootJ) {
+                this.parent[rootJ] = rootI;
+                this.count--;
+                return true;
+            }
+            return false;
+        }
+    }
+
+    async function visualizeUnionFind() {
+        const grid = gridData.map(row => [...row]); // Deep copy
+        const m = grid.length;
+        const n = grid[0].length;
+        const uf = new UnionFind(grid);
+        updateIslandCount('#union-find-count', uf.count);
+
+        const colors = {};
+        const getColor = (id) => {
+            if (!colors[id]) {
+                colors[id] = d3.interpolateRainbow(Math.random());
+            }
+            return colors[id];
+        }
+
+        for (let i = 0; i < m; i++) {
+            for (let j = 0; j < n; j++) {
+                if (grid[i][j] === '1') {
+                    const id1 = i * n + j;
+                    const root1 = uf.find(id1);
+                    updateCellColor('#union-find-vis', i, j, 'visited', getColor(root1));
+                    await sleep(animationSpeed);
+                    
+                    const directions = [[1, 0], [0, 1]]; // Only check right and down
+                    for (const [dr, dc] of directions) {
+                        const newR = i + dr;
+                        const newC = j + dc;
+                        if (newR < m && newC < n && grid[newR][newC] === '1') {
+                            const id2 = newR * n + newC;
+                            if(uf.union(id1, id2)) {
+                                updateIslandCount('#union-find-count', uf.count);
+                                const newRoot = uf.find(id1);
+                                // Recolor the entire component
+                                for (let r = 0; r < m; r++) {
+                                    for (let c = 0; c < n; c++) {
+                                        if (grid[r][c] === '1') {
+                                            const id = r * n + c;
+                                            if (uf.find(id) === newRoot) {
+                                               updateCellColor('#union-find-vis', r, c, 'visited', getColor(newRoot));
+                                            }
+                                        }
+                                    }
+                                }
+                                await sleep(animationSpeed * 2);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
+    // --- CONTROL LOGIC ---
+    function setButtonsState(running) {
+        isRunning = running;
+        startBtn.disabled = running;
+        resetBtn.disabled = running;
+    }
+
+    async function startVisualization() {
+        if (isRunning) return;
+        setButtonsState(true);
+        await Promise.all([
+            visualizeDFS(),
+            visualizeBFS(),
+            visualizeUnionFind()
+        ]);
+        setButtonsState(false);
+    }
+    
+    function resetVisualization() {
+        if (isRunning) return;
+        generateGrid();
+        
+        drawGrid(dfsSVG, gridData);
+        drawGrid(bfsSVG, gridData);
+        drawGrid(unionFindSVG, gridData);
+        
+        updateIslandCount('#dfs-count', 0);
+        updateIslandCount('#bfs-count', 0);
+        updateIslandCount('#union-find-count', 0);
+    }
+    
+    startBtn.addEventListener('click', startVisualization);
+    resetBtn.addEventListener('click', resetVisualization);
+    speedSlider.addEventListener('input', (e) => {
+        // Invert slider value so left is fast, right is slow
+        animationSpeed = 510 - e.target.value;
+    });
+
+    // --- INITIALIZATION ---
+    const dfsSVG = createGrid("#dfs-vis");
+    const bfsSVG = createGrid("#bfs-vis");
+    const unionFindSVG = createGrid("#union-find-vis");
+    
+    // Set initial speed
+    animationSpeed = 510 - speedSlider.value;
+    
+    resetVisualization(); // Initial setup
+
+</script>
+
+</body>
+</html>
